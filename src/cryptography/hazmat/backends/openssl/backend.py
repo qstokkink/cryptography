@@ -1956,6 +1956,32 @@ class Backend(object):
             self._lib.EVP_get_cipherbyname(cipher_name) != self._ffi.NULL
         )
 
+    def gensafeprime(self, bitlength):
+        generated = self._lib.BN_new()
+        err = self._lib.BN_generate_prime_ex(generated, bitlength, 1, self._ffi.NULL, self._ffi.NULL, self._ffi.NULL)
+        if err == 0:
+            self._lib.BN_clear_free(generated)
+            raise RuntimeError("Failed to generate prime!")
+        generated_hex = self._lib.BN_bn2hex(generated)
+        out = int(self._ffi.string(generated_hex), 16)
+        self._lib.OPENSSL_free(generated_hex)
+        self._lib.BN_clear_free(generated)
+        return out
+
+    def is_prime(self, n):
+        hex_n = hex(n)[2:]
+        if hex_n.endswith('L'):
+            hex_n = hex_n[:-1]
+        generated = self._lib.BN_new()
+        bn_pp = self._ffi.new("BIGNUM **", generated)
+        err = self._lib.BN_hex2bn(bn_pp, hex_n)
+        if err == 0:
+            self._lib.BN_clear_free(generated)
+            raise RuntimeError("Failed to read BIGNUM from hex string!")
+        result = self._lib.BN_is_prime_ex(generated, self._lib.BN_prime_checks_for_size(int(len(hex_n)*8)), self._ffi.NULL, self._ffi.NULL)
+        self._lib.BN_clear_free(generated)
+        return True if result == 1 else False
+
 
 class GetCipherByName(object):
     def __init__(self, fmt):
